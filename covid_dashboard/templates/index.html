@@ -1,0 +1,252 @@
+{% extends 'base.html' %}
+
+{% block title %}COVID-19疫情数据分析平台 - 首页{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> 
+            数据最后更新时间: {{ latest_date|date:"Y年m月d日" }}
+        </div>
+    </div>
+</div>
+
+<!-- 总览数据卡片 -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="data-card data-card-confirmed">
+            <h5 class="data-title">累计确诊</h5>
+            <div class="data-value">{{ today_stats.confirmed_count|default:0 }}</div>
+            {% if today_stats.confirmed_incr %}
+            <div class="data-change">
+                <i class="fas fa-arrow-up"></i> {{ today_stats.confirmed_incr }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="data-card data-card-suspected">
+            <h5 class="data-title">疑似病例</h5>
+            <div class="data-value">{{ today_stats.suspected_count|default:0 }}</div>
+            {% if today_stats.suspected_incr %}
+            <div class="data-change">
+                <i class="fas fa-arrow-up"></i> {{ today_stats.suspected_incr }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="data-card data-card-cured">
+            <h5 class="data-title">累计治愈</h5>
+            <div class="data-value">{{ today_stats.cured_count|default:0 }}</div>
+            {% if today_stats.cured_incr %}
+            <div class="data-change">
+                <i class="fas fa-arrow-up"></i> {{ today_stats.cured_incr }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="data-card data-card-dead">
+            <h5 class="data-title">累计死亡</h5>
+            <div class="data-value">{{ today_stats.dead_count|default:0 }}</div>
+            {% if today_stats.dead_incr %}
+            <div class="data-change">
+                <i class="fas fa-arrow-up"></i> {{ today_stats.dead_incr }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- 日期选择器 -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="date-selector">
+            <div class="form-group mb-0">
+                <label for="date-select">选择日期：</label>
+                <select class="form-control" id="date-select">
+                    <option value="">加载中...</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 图表区域 -->
+<div class="row">
+    <!-- 中国地图 -->
+    <div class="col-md-6">
+        <div class="chart-container">
+            <h5><i class="fas fa-map-marked-alt"></i> 全国疫情分布图</h5>
+            <div id="china-map" style="width: 100%; height: 500px;"></div>
+        </div>
+    </div>
+    
+    <!-- 趋势图 -->
+    <div class="col-md-6">
+        <div class="chart-container">
+            <h5><i class="fas fa-chart-line"></i> 全国疫情趋势</h5>
+            <div id="trend-chart" style="width: 100%; height: 500px;"></div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <!-- 新增趋势 -->
+    <div class="col-md-6">
+        <div class="chart-container">
+            <h5><i class="fas fa-chart-bar"></i> 每日新增趋势</h5>
+            <div id="daily-increase-chart" style="width: 100%; height: 400px;"></div>
+        </div>
+    </div>
+    
+    <!-- 省份排行 -->
+    <div class="col-md-6">
+        <div class="chart-container">
+            <h5><i class="fas fa-sort-amount-down"></i> 省份疫情排行</h5>
+            <div id="province-rank-chart" style="width: 100%; height: 400px;"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 初始化图表
+    let chinaMap = null;
+    let trendChart = null;
+    let dailyIncreaseChart = null;
+    let provinceRankChart = null;
+    
+    // 日期选择器
+    let currentDate = "{{ latest_date|date:'Y-m-d' }}";
+    
+    $(document).ready(function() {
+        // 初始化图表
+        initCharts();
+        
+        // 加载日期数据
+        loadAvailableDates();
+        
+        // 日期选择器事件
+        $(document).on('change', '#date-select', function() {
+            currentDate = $(this).val();
+            loadChinaMapData(currentDate);
+            loadProvinceRankData(currentDate);
+        });
+    });
+    
+    function initCharts() {
+        // 初始化中国地图
+        chinaMap = echarts.init(document.getElementById('china-map'));
+        
+        // 初始化趋势图
+        trendChart = echarts.init(document.getElementById('trend-chart'));
+        
+        // 初始化每日新增图
+        dailyIncreaseChart = echarts.init(document.getElementById('daily-increase-chart'));
+        
+        // 初始化省份排行图
+        provinceRankChart = echarts.init(document.getElementById('province-rank-chart'));
+        
+        // 加载图表数据
+        loadChinaMapData(currentDate);
+        loadTrendChartData();
+        loadProvinceRankData(currentDate);
+        
+        // 窗口大小变化时，重新调整图表大小
+        window.addEventListener('resize', function() {
+            chinaMap.resize();
+            trendChart.resize();
+            dailyIncreaseChart.resize();
+            provinceRankChart.resize();
+        });
+    }
+    
+    function loadAvailableDates() {
+        $.ajax({
+            url: "{% url 'covid_data:available_dates' %}",
+            type: "GET",
+            dataType: "json",
+            success: function(response) {
+                let dateSelect = $("#date-select");
+                dateSelect.empty();
+                
+                if (response.dates && response.dates.length > 0) {
+                    response.dates.forEach(function(date) {
+                        let option = $("<option></option>")
+                            .attr("value", date)
+                            .text(date);
+                            
+                        if (date === currentDate) {
+                            option.attr("selected", "selected");
+                        }
+                        
+                        dateSelect.append(option);
+                    });
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error("加载日期数据失败:", error);
+            }
+        });
+    }
+    
+    function loadChinaMapData(date) {
+        $.ajax({
+            url: "{% url 'covid_data:china_map_data' %}",
+            type: "GET",
+            data: { date: date },
+            dataType: "json",
+            success: function(response) {
+                if (response.map_options) {
+                    chinaMap.setOption(JSON.parse(response.map_options));
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error("加载地图数据失败:", error);
+            }
+        });
+    }
+    
+    function loadTrendChartData() {
+        $.ajax({
+            url: "{% url 'covid_data:trend_chart_data' %}",
+            type: "GET",
+            data: { days: 30 },
+            dataType: "json",
+            success: function(response) {
+                if (response.line_options) {
+                    trendChart.setOption(JSON.parse(response.line_options));
+                }
+                
+                if (response.bar_options) {
+                    dailyIncreaseChart.setOption(JSON.parse(response.bar_options));
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error("加载趋势数据失败:", error);
+            }
+        });
+    }
+    
+    function loadProvinceRankData(date) {
+        $.ajax({
+            url: "{% url 'covid_data:province_rank_data' %}",
+            type: "GET",
+            data: { date: date },
+            dataType: "json",
+            success: function(response) {
+                if (response.bar_options) {
+                    provinceRankChart.setOption(JSON.parse(response.bar_options));
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error("加载省份排行数据失败:", error);
+            }
+        });
+    }
+</script>
+{% endblock %} 
