@@ -6,6 +6,7 @@ app_name = 'covid_data'
 urlpatterns = [
     # 页面URL
     path('', views.index, name='index'),
+    path('province/<str:province_name>/', views.province_detail_page, name='province_detail_page'),
     
     # API URL
     path('api/china-map/', views.china_map_data, name='china_map_data'),
@@ -14,4 +15,5 @@ urlpatterns = [
     path('api/province/<str:province_name>/', views.province_detail, name='province_detail'),
     path('api/provinces/', views.province_list, name='province_list'),
     path('api/dates/', views.available_dates, name='available_dates'),
+    path('api/status-pie/', views.status_pie_data, name='status_pie_data'),
 ]

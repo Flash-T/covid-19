@@ -1,106 +1,120 @@
 {% extends 'base.html' %}
 
-{% block title %}{{ province.name }}疫情数据 - COVID-19疫情数据分析平台{% endblock %}
+{% block title %}{{ province.name }} - 疫情详情{% endblock %}
 
 {% block content %}
-<div class="container">
-    <!-- 返回按钮 -->
+<div class="container-fluid mt-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'covid_data:index' %}">首页</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ province.name }}</li>
+        </ol>
+    </nav>
+
     <div class="row mb-4">
         <div class="col-12">
-            <a href="{% url 'covid_data:index' %}" class="btn btn-secondary">
-                <i class="fas fa-arrow-left"></i> 返回首页
-            </a>
-        </div>
-    </div>
-    
-    <!-- 省份标题 -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="alert alert-primary">
-                <h4 class="mb-0">
-                    <i class="fas fa-map-marker-alt"></i> 
-                    {{ province.name }}疫情数据
-                    <small class="text-muted">({{ date }})</small>
-                </h4>
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> 
+                数据最后更新时间: {{ latest_date|date:"Y年m月d日" }}
             </div>
         </div>
     </div>
-    
-    <!-- 省份数据概览 -->
+
+    <!-- 省份标题与基本信息 -->
     <div class="row mb-4">
-        <div class="col-md-3">
+        <div class="col-12">
+            <h2>{{ province.name }}疫情概况</h2>
+            {% if province.comment %}
+            <div class="province-comment mt-2">
+                <i class="fas fa-comment"></i> {{ province.comment }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 省份总览数据卡片 -->
+    <div class="row mb-4">
+        <div class="col-md-4">
             <div class="data-card data-card-confirmed">
                 <h5 class="data-title">累计确诊</h5>
-                <div class="data-value" id="confirmedCount">{{ province.confirmed }}</div>
+                <div class="data-value">{{ province.confirmed_count }}</div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-4">
             <div class="data-card data-card-cured">
                 <h5 class="data-title">累计治愈</h5>
-                <div class="data-value" id="curedCount">{{ province.cured }}</div>
+                <div class="data-value">{{ province.cured_count }}</div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-4">
             <div class="data-card data-card-dead">
                 <h5 class="data-title">累计死亡</h5>
-                <div class="data-value" id="deadCount">{{ province.dead }}</div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="data-card" style="background-color: #e9ecef; border-left: 4px solid #6c757d;">
-                <h5 class="data-title">正在治疗</h5>
-                <div class="data-value" id="treatingCount">{{ province.treating }}</div>
+                <div class="data-value">{{ province.dead_count }}</div>
             </div>
         </div>
     </div>
-    
-    {% if province.comment %}
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="alert alert-warning">
-                <i class="fas fa-info-circle"></i> {{ province.comment }}
-            </div>
-        </div>
-    </div>
-    {% endif %}
-    
+
     <!-- 图表区域 -->
     <div class="row">
-        <!-- 省份饼图 -->
+        <!-- 趋势图 -->
+        <div class="col-md-12">
+            <div class="chart-container">
+                <h5><i class="fas fa-chart-line"></i> {{ province.name }}疫情趋势</h5>
+                <div id="province-trend-chart" style="width: 100%; height: 400px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <!-- 省内城市分布饼图 -->
         <div class="col-md-6">
             <div class="chart-container">
-                <h5><i class="fas fa-chart-pie"></i> {{ province.name }}疫情统计</h5>
-                <div id="province-pie" style="width: 100%; height: 400px;"></div>
+                <h5><i class="fas fa-chart-pie"></i> 疫情状态分布</h5>
+                <div id="status-pie-chart" style="width: 100%; height: 400px;"></div>
             </div>
         </div>
         
-        <!-- 城市排行 -->
+        <!-- 省内城市排行 -->
         <div class="col-md-6">
             <div class="chart-container">
-                <h5><i class="fas fa-chart-bar"></i> {{ province.name }}城市疫情统计</h5>
-                <div id="city-bar" style="width: 100%; height: 400px;"></div>
+                <h5><i class="fas fa-sort-amount-down"></i> 城市疫情排行</h5>
+                <div id="city-rank-chart" style="width: 100%; height: 400px;"></div>
             </div>
         </div>
     </div>
-    
-    <!-- 城市数据表格 -->
+
+    <!-- 城市详情表格 -->
     <div class="row mt-4">
         <div class="col-12">
             <div class="chart-container">
-                <h5><i class="fas fa-table"></i> 城市数据列表</h5>
+                <h5><i class="fas fa-table"></i> 城市疫情详情</h5>
                 <div class="table-responsive">
                     <table class="table table-striped table-hover">
                         <thead class="thead-dark">
                             <tr>
                                 <th>城市</th>
-                                <th>确诊</th>
-                                <th>治愈</th>
-                                <th>死亡</th>
-                                <th>正在治疗</th>
+                                <th>确诊人数</th>
+                                <th>治愈人数</th>
+                                <th>死亡人数</th>
+                                <th>治愈率</th>
+                                <th>死亡率</th>
                             </tr>
                         </thead>
-                        <tbody id="cityTableBody">
-                            <!-- 城市数据将通过JavaScript填充 -->
+                        <tbody>
+                            {% for city in cities %}
+                            <tr>
+                                <td>{{ city.name }}</td>
+                                <td>{{ city.confirmed_count }}</td>
+                                <td>{{ city.cured_count }}</td>
+                                <td>{{ city.dead_count }}</td>
+                                <td>{{ city.cured_count|floatformat:2 }}%</td>
+                                <td>{{ city.dead_count|floatformat:2 }}%</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center">暂无城市数据</td>
+                            </tr>
+                            {% endfor %}
                         </tbody>
                     </table>
                 </div>
@@ -112,78 +126,274 @@
 
 {% block extra_js %}
 <script>
+    // 初始化图表
+    let provinceTrendChart = null;
+    let statusPieChart = null;
+    let cityRankChart = null;
+    
     $(document).ready(function() {
-        // 加载省份详情数据
-        loadProvinceDetailData();
+        // 初始化图表
+        initCharts();
     });
     
-    function loadProvinceDetailData() {
-        $.ajax({
-            url: "{% url 'covid_data:province_detail' province_name=province.short_name %}",
-            type: "GET",
-            dataType: "json",
-            success: function(response) {
-                // 更新省份数据
-                $("#confirmedCount").text(formatNumber(response.province.confirmed));
-                $("#curedCount").text(formatNumber(response.province.cured));
-                $("#deadCount").text(formatNumber(response.province.dead));
-                
-                const treating = response.province.confirmed - response.province.cured - response.province.dead;
-                $("#treatingCount").text(formatNumber(treating));
-                
-                // 渲染饼图
-                if (response.pie_options) {
-                    const pieChart = echarts.init(document.getElementById('province-pie'));
-                    pieChart.setOption(JSON.parse(response.pie_options));
-                    
-                    // 窗口大小变化时调整图表大小
-                    window.addEventListener('resize', function() {
-                        pieChart.resize();
-                    });
+    function initCharts() {
+        // 初始化省份趋势图
+        provinceTrendChart = echarts.init(document.getElementById('province-trend-chart'));
+        renderProvinceTrend();
+        
+        // 初始化省份状态饼图
+        statusPieChart = echarts.init(document.getElementById('status-pie-chart'));
+        renderStatusPie();
+        
+        // 初始化城市排行图
+        cityRankChart = echarts.init(document.getElementById('city-rank-chart'));
+        renderCityRank();
+        
+        // 窗口大小变化时，重新调整图表大小
+        window.addEventListener('resize', function() {
+            provinceTrendChart.resize();
+            statusPieChart.resize();
+            cityRankChart.resize();
+        });
+    }
+    
+    function renderProvinceTrend() {
+        // 从后端获取的数据
+        const trendData = {
+            dates: {{ trend_data.dates|safe }},
+            confirmed: {{ trend_data.confirmed|safe }},
+            cured: {{ trend_data.cured|safe }},
+            dead: {{ trend_data.dead|safe }}
+        };
+        
+        const option = {
+            title: {
+                text: '{{ province.name }}疫情趋势',
+                left: 'center'
+            },
+            tooltip: {
+                trigger: 'axis'
+            },
+            legend: {
+                data: ['确诊', '治愈', '死亡'],
+                top: 30
+            },
+            grid: {
+                left: '3%',
+                right: '4%',
+                bottom: '3%',
+                containLabel: true
+            },
+            xAxis: {
+                type: 'category',
+                boundaryGap: false,
+                data: trendData.dates
+            },
+            yAxis: {
+                type: 'value'
+            },
+            series: [
+                {
+                    name: '确诊',
+                    type: 'line',
+                    data: trendData.confirmed,
+                    smooth: true,
+                    lineStyle: {
+                        width: 3,
+                        color: "#c92727"
+                    },
+                    itemStyle: {
+                        color: "#c92727"
+                    }
+                },
+                {
+                    name: '治愈',
+                    type: 'line',
+                    data: trendData.cured,
+                    smooth: true,
+                    lineStyle: {
+                        width: 3,
+                        color: "#28a745"
+                    },
+                    itemStyle: {
+                        color: "#28a745"
+                    }
+                },
+                {
+                    name: '死亡',
+                    type: 'line',
+                    data: trendData.dead,
+                    smooth: true,
+                    lineStyle: {
+                        width: 3,
+                        color: "#5d7092"
+                    },
+                    itemStyle: {
+                        color: "#5d7092"
+                    }
                 }
-                
-                // 渲染柱状图
-                if (response.bar_options) {
-                    const barChart = echarts.init(document.getElementById('city-bar'));
-                    barChart.setOption(JSON.parse(response.bar_options));
-                    
-                    // 窗口大小变化时调整图表大小
-                    window.addEventListener('resize', function() {
-                        barChart.resize();
-                    });
+            ]
+        };
+        
+        provinceTrendChart.setOption(option);
+    }
+    
+    function renderStatusPie() {
+        const confirmed = {{ province.confirmed_count }};
+        const cured = {{ province.cured_count }};
+        const dead = {{ province.dead_count }};
+        const existing = confirmed - cured - dead;
+        
+        const option = {
+            title: {
+                text: '{{ province.name }}疫情状态分布',
+                left: 'center'
+            },
+            tooltip: {
+                trigger: 'item',
+                formatter: '{b}: {c} ({d}%)'
+            },
+            legend: {
+                orient: 'vertical',
+                left: 10,
+                top: 30,
+                data: ['治愈', '死亡', '现存确诊']
+            },
+            series: [
+                {
+                    name: '状态分布',
+                    type: 'pie',
+                    radius: ['40%', '70%'],
+                    avoidLabelOverlap: false,
+                    label: {
+                        show: true,
+                        formatter: '{b}: {c} ({d}%)'
+                    },
+                    emphasis: {
+                        label: {
+                            show: true,
+                            fontSize: '18',
+                            fontWeight: 'bold'
+                        }
+                    },
+                    labelLine: {
+                        show: true
+                    },
+                    data: [
+                        { value: cured, name: '治愈', itemStyle: { color: '#28a745' } },
+                        { value: dead, name: '死亡', itemStyle: { color: '#5d7092' } },
+                        { value: existing, name: '现存确诊', itemStyle: { color: '#c92727' } }
+                    ]
                 }
-                
-                // 填充城市数据表格
-                const cityTableBody = $("#cityTableBody");
-                cityTableBody.empty();
-                
-                if (response.cities && response.cities.length > 0) {
-                    response.cities.forEach(function(city) {
-                        const treating = city.confirmed - city.cured - city.dead;
-                        const row = `
-                            <tr>
-                                <td>${city.name}</td>
-                                <td>${formatNumber(city.confirmed)}</td>
-                                <td>${formatNumber(city.cured)}</td>
-                                <td>${formatNumber(city.dead)}</td>
-                                <td>${formatNumber(treating)}</td>
-                            </tr>
-                        `;
-                        cityTableBody.append(row);
-                    });
-                } else {
-                    cityTableBody.append(`
-                        <tr>
-                            <td colspan="5" class="text-center">暂无城市数据</td>
-                        </tr>
-                    `);
+            ]
+        };
+        
+        statusPieChart.setOption(option);
+    }
+    
+    function renderCityRank() {
+        // 从后端获取数据渲染
+        const cityData = [];
+        {% for city in cities|slice:":10" %}
+        cityData.push({
+            name: "{{ city.name }}",
+            confirmed: {{ city.confirmed_count }},
+            cured: {{ city.cured_count }},
+            dead: {{ city.dead_count }}
+        });
+        {% endfor %}
+        
+        // 如果没有数据，显示空图表
+        if (cityData.length === 0) {
+            cityRankChart.setOption({
+                title: {
+                    text: '暂无城市数据',
+                    left: 'center'
+                }
+            });
+            return;
+        }
+        
+        // 按确诊数量排序
+        cityData.sort((a, b) => a.confirmed - b.confirmed);
+        
+        const cityNames = cityData.map(city => city.name);
+        const confirmedData = cityData.map(city => city.confirmed);
+        const curedData = cityData.map(city => city.cured);
+        const deadData = cityData.map(city => city.dead);
+        
+        const option = {
+            title: {
+                text: '城市确诊排行',
+                left: 'center'
+            },
+            tooltip: {
+                trigger: 'axis',
+                axisPointer: {
+                    type: 'shadow'
                 }
             },
-            error: function(xhr, status, error) {
-                console.error("加载省份数据失败:", error);
-                alert("加载省份数据失败，请稍后重试");
-            }
-        });
+            legend: {
+                data: ['确诊', '治愈', '死亡'],
+                top: 30
+            },
+            grid: {
+                left: '3%',
+                right: '4%',
+                bottom: '3%',
+                containLabel: true
+            },
+            xAxis: {
+                type: 'value'
+            },
+            yAxis: {
+                type: 'category',
+                data: cityNames
+            },
+            series: [
+                {
+                    name: '确诊',
+                    type: 'bar',
+                    stack: '总量',
+                    label: {
+                        show: true,
+                        position: 'insideRight'
+                    },
+                    itemStyle: {
+                        color: '#c92727'
+                    },
+                    data: confirmedData
+                },
+                {
+                    name: '治愈',
+                    type: 'bar',
+                    stack: '总量',
+                    label: {
+                        show: true,
+                        position: 'insideRight'
+                    },
+                    itemStyle: {
+                        color: '#28a745'
+                    },
+                    data: curedData
+                },
+                {
+                    name: '死亡',
+                    type: 'bar',
+                    stack: '总量',
+                    label: {
+                        show: true,
+                        position: 'insideRight'
+                    },
+                    itemStyle: {
+                        color: '#5d7092'
+                    },
+                    data: deadData
+                }
+            ]
+        };
+        
+        cityRankChart.setOption(option);
     }
 </script>
 {% endblock %} 

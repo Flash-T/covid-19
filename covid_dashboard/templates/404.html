@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block title %}页面未找到 - COVID-19疫情数据分析平台{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-8 offset-md-2 text-center">
+            <div class="error-template">
+                <h1>
+                    <i class="fas fa-exclamation-triangle text-warning"></i> 404
+                </h1>
+                <h2>页面未找到</h2>
+                <div class="error-details mb-4">
+                    {% if message %}
+                        {{ message }}
+                    {% else %}
+                        抱歉，您请求的页面不存在。
+                    {% endif %}
+                </div>
+                <div class="error-actions">
+                    <a href="{% url 'covid_data:index' %}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-home"></i> 返回首页
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

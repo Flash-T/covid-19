@@ -76,16 +76,8 @@
 
 <!-- 图表区域 -->
 <div class="row">
-    <!-- 中国地图 -->
-    <div class="col-md-6">
-        <div class="chart-container">
-            <h5><i class="fas fa-map-marked-alt"></i> 全国疫情分布图</h5>
-            <div id="china-map" style="width: 100%; height: 500px;"></div>
-        </div>
-    </div>
-    
     <!-- 趋势图 -->
-    <div class="col-md-6">
+    <div class="col-md-12">
         <div class="chart-container">
             <h5><i class="fas fa-chart-line"></i> 全国疫情趋势</h5>
             <div id="trend-chart" style="width: 100%; height: 500px;"></div>
@@ -94,19 +86,21 @@
 </div>
 
 <div class="row mt-4">
-    <!-- 新增趋势 -->
-    <div class="col-md-6">
-        <div class="chart-container">
-            <h5><i class="fas fa-chart-bar"></i> 每日新增趋势</h5>
-            <div id="daily-increase-chart" style="width: 100%; height: 400px;"></div>
-        </div>
-    </div>
-    
     <!-- 省份排行 -->
-    <div class="col-md-6">
+    <div class="col-md-12">
         <div class="chart-container">
             <h5><i class="fas fa-sort-amount-down"></i> 省份疫情排行</h5>
             <div id="province-rank-chart" style="width: 100%; height: 400px;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 新增饼图看板 -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="chart-container">
+            <h5><i class="fas fa-chart-pie"></i> 疫情状态分布</h5>
+            <div id="status-pie-chart" style="width: 100%; height: 400px;"></div>
         </div>
     </div>
 </div>
@@ -115,10 +109,9 @@
 {% block extra_js %}
 <script>
     // 初始化图表
-    let chinaMap = null;
     let trendChart = null;
-    let dailyIncreaseChart = null;
     let provinceRankChart = null;
+    let statusPieChart = null;
     
     // 日期选择器
     let currentDate = "{{ latest_date|date:'Y-m-d' }}";
@@ -133,35 +126,32 @@
         // 日期选择器事件
         $(document).on('change', '#date-select', function() {
             currentDate = $(this).val();
-            loadChinaMapData(currentDate);
+            loadTrendChartData();
             loadProvinceRankData(currentDate);
+            loadStatusPieData(currentDate);
         });
     });
     
     function initCharts() {
-        // 初始化中国地图
-        chinaMap = echarts.init(document.getElementById('china-map'));
-        
         // 初始化趋势图
         trendChart = echarts.init(document.getElementById('trend-chart'));
-        
-        // 初始化每日新增图
-        dailyIncreaseChart = echarts.init(document.getElementById('daily-increase-chart'));
         
         // 初始化省份排行图
         provinceRankChart = echarts.init(document.getElementById('province-rank-chart'));
         
+        // 初始化疫情状态饼图
+        statusPieChart = echarts.init(document.getElementById('status-pie-chart'));
+        
         // 加载图表数据
-        loadChinaMapData(currentDate);
         loadTrendChartData();
         loadProvinceRankData(currentDate);
+        loadStatusPieData(currentDate);
         
         // 窗口大小变化时，重新调整图表大小
         window.addEventListener('resize', function() {
-            chinaMap.resize();
             trendChart.resize();
-            dailyIncreaseChart.resize();
             provinceRankChart.resize();
+            statusPieChart.resize();
         });
     }
     
@@ -194,23 +184,6 @@
         });
     }
     
-    function loadChinaMapData(date) {
-        $.ajax({
-            url: "{% url 'covid_data:china_map_data' %}",
-            type: "GET",
-            data: { date: date },
-            dataType: "json",
-            success: function(response) {
-                if (response.map_options) {
-                    chinaMap.setOption(JSON.parse(response.map_options));
-                }
-            },
-            error: function(xhr, status, error) {
-                console.error("加载地图数据失败:", error);
-            }
-        });
-    }
-    
     function loadTrendChartData() {
         $.ajax({
             url: "{% url 'covid_data:trend_chart_data' %}",
@@ -220,10 +193,6 @@
             success: function(response) {
                 if (response.line_options) {
                     trendChart.setOption(JSON.parse(response.line_options));
-                }
-                
-                if (response.bar_options) {
-                    dailyIncreaseChart.setOption(JSON.parse(response.bar_options));
                 }
             },
             error: function(xhr, status, error) {
@@ -241,10 +210,35 @@
             success: function(response) {
                 if (response.bar_options) {
                     provinceRankChart.setOption(JSON.parse(response.bar_options));
+                    
+                    // 添加点击事件跳转到省份详情页
+                    provinceRankChart.on('click', function(params) {
+                        if (params.componentType === 'series') {
+                            const provinceName = params.name;
+                            window.location.href = "{% url 'covid_data:province_detail_page' province_name='REPLACE_NAME' %}".replace('REPLACE_NAME', provinceName);
+                        }
+                    });
                 }
             },
             error: function(xhr, status, error) {
                 console.error("加载省份排行数据失败:", error);
+            }
+        });
+    }
+    
+    function loadStatusPieData(date) {
+        $.ajax({
+            url: "{% url 'covid_data:status_pie_data' %}",
+            type: "GET",
+            data: { date: date },
+            dataType: "json",
+            success: function(response) {
+                if (response.pie_options) {
+                    statusPieChart.setOption(JSON.parse(response.pie_options));
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error("加载疫情状态数据失败:", error);
             }
         });
     }

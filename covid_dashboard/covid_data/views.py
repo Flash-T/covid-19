@@ -141,10 +141,7 @@ def trend_chart_data(request):
                 'confirmed_count': item.confirmed_count,
                 'suspected_count': item.suspected_count,
                 'cured_count': item.cured_count,
-                'dead_count': item.dead_count,
-                'confirmed_incr': item.confirmed_incr,
-                'cured_incr': item.cured_incr,
-                'dead_incr': item.dead_incr
+                'dead_count': item.dead_count
             }
             for item in daily_data
         ]
@@ -179,41 +176,6 @@ def trend_chart_data(request):
             xaxis_opts=opts.AxisOpts(type_="category", boundary_gap=False),
         )
     )
-    
-    # 如果有增量数据，增加每日新增柱状图
-    if 'confirmed_incr' in daily_data[0]:
-        confirmed_incr = [item['confirmed_incr'] for item in daily_data]
-        cured_incr = [item['cured_incr'] for item in daily_data]
-        dead_incr = [item['dead_incr'] for item in daily_data]
-        
-        bar_chart = (
-            Bar(init_opts=opts.InitOpts(theme=ThemeType.WESTEROS))
-            .add_xaxis(x_data)
-            .add_yaxis("新增确诊", confirmed_incr, 
-                      category_gap="50%", color="#c92727",
-                      label_opts=opts.LabelOpts(is_show=False))
-            .add_yaxis("新增治愈", cured_incr, 
-                      category_gap="50%", color="#28a745",
-                      label_opts=opts.LabelOpts(is_show=False))
-            .add_yaxis("新增死亡", dead_incr, 
-                      category_gap="50%", color="#5d7092",
-                      label_opts=opts.LabelOpts(is_show=False))
-            .set_global_opts(
-                title_opts=opts.TitleOpts(title="每日新增趋势"),
-                tooltip_opts=opts.TooltipOpts(trigger="axis"),
-                yaxis_opts=opts.AxisOpts(
-                    type_="value",
-                    axistick_opts=opts.AxisTickOpts(is_show=True),
-                    splitline_opts=opts.SplitLineOpts(is_show=True),
-                ),
-                xaxis_opts=opts.AxisOpts(type_="category", boundary_gap=True),
-            )
-        )
-        
-        return JsonResponse({
-            "line_options": line_chart.dump_options(),
-            "bar_options": bar_chart.dump_options()
-        })
     
     return JsonResponse({
         "line_options": line_chart.dump_options(),
@@ -419,4 +381,121 @@ def available_dates(request):
     
     return JsonResponse({
         'dates': date_list
-    }) 
+    })
+
+def status_pie_data(request):
+    """疫情状态分布饼图数据API"""
+    date_str = request.GET.get('date')
+    
+    if date_str:
+        try:
+            query_date = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            query_date = Province.objects.aggregate(Max('data_date'))['data_date__max']
+    else:
+        query_date = Province.objects.aggregate(Max('data_date'))['data_date__max']
+    
+    # 获取全国数据
+    stats = Province.objects.filter(data_date=query_date).aggregate(
+        confirmed=Sum('confirmed_count'),
+        cured=Sum('cured_count'),
+        dead=Sum('dead_count')
+    )
+    
+    confirmed = stats['confirmed'] or 0
+    cured = stats['cured'] or 0
+    dead = stats['dead'] or 0
+    
+    # 计算现存确诊（总确诊减去治愈和死亡）
+    existing = confirmed - cured - dead
+    
+    # 生成饼图数据
+    pie_data = [
+        ('治愈', cured),
+        ('死亡', dead),
+        ('现存确诊', existing)
+    ]
+    
+    # 创建饼图
+    pie_chart = (
+        Pie(init_opts=opts.InitOpts(theme=ThemeType.WESTEROS))
+        .add(
+            "",
+            pie_data,
+            radius=["40%", "70%"],
+            center=["50%", "50%"]
+        )
+        .set_global_opts(
+            title_opts=opts.TitleOpts(title=f"疫情状态分布 - {query_date}"),
+            legend_opts=opts.LegendOpts(
+                orient="vertical",
+                pos_top="15%",
+                pos_left="2%"
+            ),
+            tooltip_opts=opts.TooltipOpts(
+                trigger="item",
+                formatter="{b}: {c} ({d}%)"
+            )
+        )
+        .set_series_opts(
+            label_opts=opts.LabelOpts(
+                formatter="{b}: {c} ({d}%)",
+                font_size=14,
+                font_weight="bold"
+            )
+        )
+    )
+    
+    # 设置颜色
+    pie_chart.set_colors(["#28a745", "#5d7092", "#c92727"])
+    
+    return JsonResponse({
+        "pie_options": pie_chart.dump_options(),
+        "date": query_date.strftime('%Y-%m-%d'),
+    })
+
+def province_detail_page(request, province_name):
+    """省份详情页面"""
+    latest_date = Province.objects.aggregate(Max('data_date'))['data_date__max']
+    
+    # 获取省份数据
+    province = Province.objects.filter(
+        short_name=province_name,
+        data_date=latest_date
+    ).first()
+    
+    if not province:
+        return render(request, '404.html', {'message': f'未找到省份: {province_name}'}, status=404)
+    
+    # 获取该省的城市数据
+    cities = City.objects.filter(
+        province=province,
+        data_date=latest_date
+    ).order_by('-confirmed_count')
+    
+    # 获取历史数据
+    history_dates = Province.objects.filter(
+        short_name=province_name
+    ).values_list('data_date', flat=True).distinct().order_by('data_date')
+    
+    history_data = Province.objects.filter(
+        short_name=province_name,
+        data_date__in=history_dates
+    ).order_by('data_date')
+    
+    # 准备图表数据
+    trend_data = {
+        'dates': [d.data_date.strftime('%m-%d') for d in history_data],
+        'confirmed': [d.confirmed_count for d in history_data],
+        'cured': [d.cured_count for d in history_data],
+        'dead': [d.dead_count for d in history_data],
+    }
+    
+    context = {
+        'province': province,
+        'cities': cities,
+        'latest_date': latest_date,
+        'trend_data': trend_data,
+    }
+    
+    return render(request, 'province_detail.html', context) 
