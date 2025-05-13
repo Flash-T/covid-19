@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block title %}个人中心 - COVID-19疫情数据分析平台{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card shadow">
+                <div class="card-header bg-info text-white">
+                    <h3 class="mb-0"><i class="fas fa-user-circle mr-2"></i>个人中心</h3>
+                </div>
+                <div class="card-body">
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }}">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                    
+                    <div class="row">
+                        <div class="col-md-4 text-center">
+                            <img src="https://ui-avatars.com/api/?name={{ user.username }}&background=random&size=200" 
+                                 class="img-fluid rounded-circle mb-3" alt="{{ user.username }}">
+                            <h4>{{ user.username }}</h4>
+                            <p class="text-muted">
+                                <i class="fas fa-envelope mr-2"></i>{{ user.email }}
+                            </p>
+                            {% if user.profile.phone %}
+                            <p class="text-muted">
+                                <i class="fas fa-phone mr-2"></i>{{ user.profile.phone }}
+                            </p>
+                            {% endif %}
+                            <p class="text-muted">
+                                <i class="fas fa-calendar-alt mr-2"></i>注册于: {{ user.profile.created_at|date:"Y-m-d" }}
+                            </p>
+                        </div>
+                        <div class="col-md-8">
+                            <h4 class="border-bottom pb-2">账户信息</h4>
+                            <div class="mt-4">
+                                <p><strong>用户名:</strong> {{ user.username }}</p>
+                                <p><strong>邮箱:</strong> {{ user.email }}</p>
+                                <p><strong>手机号:</strong> {{ user.profile.phone|default:"未设置" }}</p>
+                                <p><strong>上次登录:</strong> {{ user.last_login|date:"Y-m-d H:i:s" }}</p>
+                            </div>
+                            
+                            <div class="mt-4">
+                                <a href="{% url 'covid_data:index' %}" class="btn btn-primary">
+                                    <i class="fas fa-chart-bar mr-2"></i>返回疫情数据
+                                </a>
+                                <a href="{% url 'covid_data:logout' %}" class="btn btn-danger ml-2">
+                                    <i class="fas fa-sign-out-alt mr-2"></i>退出登录
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -1,12 +1,16 @@
 import json
 import datetime
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from django.db.models import Sum, F, Max
 from pyecharts.charts import Map, Line, Bar, Pie
 from pyecharts import options as opts
 from pyecharts.globals import ThemeType
 from .models import Province, City, DailyStatistics
+from django.contrib.auth import login, authenticate, logout
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from .forms import UserRegisterForm, UserLoginForm
 
 def index(request):
     """首页展示四个看板"""
@@ -498,4 +502,65 @@ def province_detail_page(request, province_name):
         'trend_data': trend_data,
     }
     
-    return render(request, 'province_detail.html', context) 
+    return render(request, 'province_detail.html', context)
+
+# 首页重定向视图
+def home_redirect_view(request):
+    """首页重定向到登录页面，如果已登录则重定向到仪表盘"""
+    if request.user.is_authenticated:
+        return redirect('covid_data:index')
+    return redirect('covid_data:login')
+
+# 用户认证相关视图
+def register_view(request):
+    """用户注册视图"""
+    if request.user.is_authenticated:
+        return redirect('covid_data:index')
+        
+    if request.method == 'POST':
+        form = UserRegisterForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            messages.success(request, f'账号创建成功！欢迎 {user.username}!')
+            return redirect('covid_data:index')
+    else:
+        form = UserRegisterForm()
+    return render(request, 'auth/register.html', {'form': form})
+
+def login_view(request):
+    """用户登录视图"""
+    if request.user.is_authenticated:
+        return redirect('covid_data:index')
+        
+    if request.method == 'POST':
+        form = UserLoginForm(request.POST)
+        if form.is_valid():
+            username = form.cleaned_data.get('username')
+            password = form.cleaned_data.get('password')
+            user = authenticate(username=username, password=password)
+            if user is not None:
+                login(request, user)
+                messages.success(request, f'欢迎回来，{username}!')
+                # 如果存在next参数，则重定向到该参数指定的URL
+                next_url = request.GET.get('next')
+                if next_url:
+                    return redirect(next_url)
+                return redirect('covid_data:index')
+            else:
+                messages.error(request, '用户名或密码错误，请重试。')
+    else:
+        form = UserLoginForm()
+    return render(request, 'auth/login.html', {'form': form})
+
+def logout_view(request):
+    """用户登出视图"""
+    logout(request)
+    messages.success(request, '您已成功退出登录。')
+    return redirect('covid_data:login')
+
+# 用户个人资料视图
+@login_required
+def profile_view(request):
+    """用户个人资料视图"""
+    return render(request, 'auth/profile.html', {'user': request.user}) 
